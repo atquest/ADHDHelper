@@ -37,15 +37,16 @@ export function setupAuth(app: Express) {
   const sessionConfig: session.SessionOptions = {
     name: 'adhd.sid',
     secret: process.env.SESSION_SECRET || 'adhd-support-secret-key',
-    resave: false,
-    saveUninitialized: false,
+    resave: true, // Belangrijk: voorkomt sessie expiratie tussen requesten
+    saveUninitialized: true, // Belangrijk voor het instellen van cookie bij eerste request
     cookie: {
       path: '/',
       httpOnly: true,
-      secure: false, // alleen true in productie met HTTPS
+      secure: true, // Nodig omdat we sameSite: 'none' gebruiken
       maxAge: 7 * 24 * 60 * 60 * 1000, // 1 week
-      sameSite: 'lax'
+      sameSite: 'none' // Belangrijk: werkt beter met iframe-gebaseerde omgevingen zoals Replit
     },
+    rolling: true, // Verlengt de sessie bij elke request
     store: storage.sessionStore
   };
 

@@ -73,11 +73,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Login functie
   const login = async (username: string, password: string) => {
     try {
+      console.log("Login poging voor:", username);
       setError(null);
+      
+      // Eerst vragen we een sessie-cookie aan voor de eerste request
+      await fetch('/api/session-check', {
+        credentials: 'include',
+        headers: {
+          'Accept': 'application/json',
+          'Cache-Control': 'no-cache, no-store',
+          'Pragma': 'no-cache'
+        }
+      });
+      
+      // Dan doen we de login
       const response = await fetch('/api/login', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Cache-Control': 'no-cache, no-store',
+          'Pragma': 'no-cache'
         },
         body: JSON.stringify({ username, password }),
         credentials: 'include'
@@ -89,15 +105,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       
       const userData = await response.json();
-      setUser(userData);
+      console.log("Login geslaagd, gebruikersdata:", userData);
       
-      toast({
-        title: 'Ingelogd',
-        description: `Welkom terug, ${userData.username}!`,
+      // Verifieer dat we daadwerkelijk zijn ingelogd door een aparte API-aanroep te doen
+      const verifyResponse = await fetch('/api/user', {
+        credentials: 'include',
+        headers: {
+          'Accept': 'application/json',
+          'Cache-Control': 'no-cache, no-store',
+          'Pragma': 'no-cache'
+        }
       });
       
-      // Navigeer naar de homepage
-      window.location.href = '/';
+      if (verifyResponse.ok) {
+        const verifiedUser = await verifyResponse.json();
+        console.log("Sessie geverifieerd, gebruiker:", verifiedUser);
+        setUser(verifiedUser);
+        
+        toast({
+          title: 'Ingelogd',
+          description: `Welkom terug, ${verifiedUser.username}!`,
+        });
+        
+        // Navigeer naar de homepage met een korte vertraging
+        setTimeout(() => {
+          window.location.href = '/';
+        }, 300);
+      } else {
+        console.error("Sessie verificatie mislukt na login");
+        throw new Error("Sessie verificatie mislukt na login");
+      }
     } catch (err) {
       console.error('Login fout:', err);
       setError(err instanceof Error ? err : new Error('Onbekende fout bij inloggen'));
@@ -112,11 +149,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Registratie functie
   const register = async (username: string, password: string) => {
     try {
+      console.log("Registratie poging voor:", username);
       setError(null);
+      
+      // Eerst vragen we een sessie-cookie aan voor de eerste request
+      await fetch('/api/session-check', {
+        credentials: 'include',
+        headers: {
+          'Accept': 'application/json',
+          'Cache-Control': 'no-cache, no-store',
+          'Pragma': 'no-cache'
+        }
+      });
+      
+      // Dan doen we de registratie
       const response = await fetch('/api/register', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Cache-Control': 'no-cache, no-store',
+          'Pragma': 'no-cache'
         },
         body: JSON.stringify({ username, password }),
         credentials: 'include'
@@ -128,15 +181,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       
       const userData = await response.json();
-      setUser(userData);
+      console.log("Registratie geslaagd, gebruikersdata:", userData);
       
-      toast({
-        title: 'Account aangemaakt',
-        description: `Welkom bij ADHD Support, ${userData.username}!`,
+      // Verifieer dat we daadwerkelijk zijn ingelogd door een aparte API-aanroep te doen
+      const verifyResponse = await fetch('/api/user', {
+        credentials: 'include',
+        headers: {
+          'Accept': 'application/json',
+          'Cache-Control': 'no-cache, no-store',
+          'Pragma': 'no-cache'
+        }
       });
       
-      // Navigeer naar de homepage
-      window.location.href = '/';
+      if (verifyResponse.ok) {
+        const verifiedUser = await verifyResponse.json();
+        console.log("Sessie geverifieerd na registratie, gebruiker:", verifiedUser);
+        setUser(verifiedUser);
+        
+        toast({
+          title: 'Account aangemaakt',
+          description: `Welkom bij ADHD Support, ${verifiedUser.username}!`,
+        });
+        
+        // Navigeer naar de homepage met een korte vertraging
+        setTimeout(() => {
+          window.location.href = '/';
+        }, 300);
+      } else {
+        console.error("Sessie verificatie mislukt na registratie");
+        throw new Error("Sessie verificatie mislukt na registratie");
+      }
     } catch (err) {
       console.error('Registratie fout:', err);
       setError(err instanceof Error ? err : new Error('Onbekende fout bij registreren'));
@@ -151,8 +225,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Logout functie
   const logout = async () => {
     try {
+      console.log("Uitloggen...");
       const response = await fetch('/api/logout', {
         method: 'POST',
+        headers: {
+          'Accept': 'application/json',
+          'Cache-Control': 'no-cache, no-store',
+          'Pragma': 'no-cache'
+        },
         credentials: 'include'
       });
       
@@ -161,6 +241,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         throw new Error(errorData.message || 'Uitloggen mislukt');
       }
       
+      console.log("Logout succesvol, verwerkende status...");
       setUser(null);
       
       toast({
@@ -168,8 +249,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         description: 'Je bent succesvol uitgelogd.',
       });
       
-      // Navigeer naar de login pagina
-      window.location.href = '/auth';
+      // Navigeer naar de login pagina met een korte vertraging
+      setTimeout(() => {
+        console.log("Navigeren naar login pagina...");
+        window.location.href = '/auth';
+      }, 300);
     } catch (err) {
       console.error('Logout fout:', err);
       toast({
