@@ -12,6 +12,7 @@ import { ProtectedRoute } from "./lib/protected-route";
 import { ThemeProvider } from "next-themes";
 import Navbar from "./components/layout/navbar";
 import Footer from "./components/layout/footer";
+import { AuthProvider } from "./hooks/use-auth";
 
 function Router() {
   return (
@@ -29,18 +30,20 @@ function Router() {
 
 function App() {
   return (
-    <ThemeProvider attribute="class" defaultTheme="light">
-      <TooltipProvider>
-        <div className="min-h-screen flex flex-col">
-          <Navbar />
-          <main className="flex-grow">
-            <Router />
-          </main>
-          <Footer />
-          <Toaster />
-        </div>
-      </TooltipProvider>
-    </ThemeProvider>
+    <AuthProvider>
+      <ThemeProvider attribute="class" defaultTheme="light">
+        <TooltipProvider>
+          <div className="min-h-screen flex flex-col">
+            <Navbar />
+            <main className="flex-grow">
+              <Router />
+            </main>
+            <Footer />
+            <Toaster />
+          </div>
+        </TooltipProvider>
+      </ThemeProvider>
+    </AuthProvider>
   );
 }
 
