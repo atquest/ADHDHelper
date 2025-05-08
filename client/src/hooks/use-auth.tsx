@@ -93,7 +93,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     } catch (err) {
       console.error('Fout bij ophalen gebruiker:', err);
-      setUser(null);
+      updateUser(null);
     } finally {
       setIsLoading(false);
     }
@@ -143,8 +143,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const userData = await response.json();
       console.log("Login gegevens ontvangen, gebruiker:", userData);
       
-      // Stel de gebruiker direct in
-      setUser(userData);
+      // Stel de gebruiker direct in en sla op in localStorage
+      updateUser(userData);
       
       toast({
         title: 'Ingelogd',
@@ -199,8 +199,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const userData = await response.json();
       console.log("Registratie gegevens ontvangen, gebruiker:", userData);
       
-      // Stel de gebruiker direct in
-      setUser(userData);
+      // Stel de gebruiker direct in en sla op in localStorage
+      updateUser(userData);
       
       toast({
         title: 'Account aangemaakt',
@@ -245,7 +245,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       
       console.log("Logout succesvol, verwerkende status...");
-      setUser(null);
+      updateUser(null);
       
       toast({
         title: 'Uitgelogd',
