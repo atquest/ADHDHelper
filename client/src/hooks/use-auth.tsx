@@ -79,9 +79,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     data: user,
     error,
     isLoading,
+    refetch,
   } = useQuery<SelectUser | undefined, Error>({
     queryKey: ["/api/user"],
     queryFn: getQueryFn({ on401: "returnNull" }),
+    retry: false,
+    refetchOnWindowFocus: true, // Refetch when window gets focus
+    refetchInterval: 5 * 60 * 1000, // Refetch every 5 minutes to keep session alive
   });
 
   const loginMutation = useMutation({
@@ -91,10 +95,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     },
     onSuccess: (user: SelectUser) => {
       queryClient.setQueryData(["/api/user"], user);
+      refetch(); // Explicitly refetch to ensure we get the latest data
+      toast({
+        title: "Ingelogd",
+        description: `Welkom terug, ${user.username}!`,
+      });
     },
     onError: (error: Error) => {
       toast({
-        title: "Login failed",
+        title: "Login mislukt",
         description: error.message,
         variant: "destructive",
       });
@@ -108,10 +117,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     },
     onSuccess: (user: SelectUser) => {
       queryClient.setQueryData(["/api/user"], user);
+      refetch(); // Explicitly refetch to ensure we get the latest data
+      toast({
+        title: "Account aangemaakt",
+        description: `Welkom bij ADHD Support, ${user.username}!`,
+      });
     },
     onError: (error: Error) => {
       toast({
-        title: "Registration failed",
+        title: "Registratie mislukt",
         description: error.message,
         variant: "destructive",
       });
@@ -124,10 +138,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     },
     onSuccess: () => {
       queryClient.setQueryData(["/api/user"], null);
+      toast({
+        title: "Uitgelogd",
+        description: "Je bent succesvol uitgelogd.",
+      });
     },
     onError: (error: Error) => {
       toast({
-        title: "Logout failed",
+        title: "Uitloggen mislukt",
         description: error.message,
         variant: "destructive",
       });

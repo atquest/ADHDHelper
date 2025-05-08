@@ -29,6 +29,8 @@ async function comparePasswords(supplied: string, stored: string) {
 }
 
 export function setupAuth(app: Express) {
+  const isProduction = process.env.NODE_ENV === 'production';
+  
   const sessionSettings: session.SessionOptions = {
     secret: process.env.SESSION_SECRET || 'adhd-support-session-secret',
     resave: false,
@@ -37,9 +39,10 @@ export function setupAuth(app: Express) {
     cookie: {
       maxAge: 1000 * 60 * 60 * 24 * 7, // 1 week
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax'
-    }
+      secure: isProduction,
+      sameSite: isProduction ? 'strict' : 'lax'
+    },
+    name: 'adhd-support.sid'
   };
 
   app.set("trust proxy", 1);
