@@ -26,8 +26,32 @@ const AuthContext = createContext<AuthContextType | null>(null);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(true);
-  const [user, setUser] = useState<UserWithoutPassword | null>(null);
+  const [user, setUser] = useState<UserWithoutPassword | null>(() => {
+    // Probeer gebruiker uit localStorage te halen bij initialisatie
+    const savedUser = localStorage.getItem('adhd_user');
+    if (savedUser) {
+      try {
+        return JSON.parse(savedUser);
+      } catch (e) {
+        console.error('Fout bij het parsen van opgeslagen gebruiker:', e);
+        localStorage.removeItem('adhd_user');
+      }
+    }
+    return null;
+  });
   const [error, setError] = useState<Error | null>(null);
+  
+  // Custom setUser functie die ook localStorage bijwerkt
+  const updateUser = (newUser: UserWithoutPassword | null) => {
+    if (newUser) {
+      // Sla de gebruiker op in localStorage
+      localStorage.setItem('adhd_user', JSON.stringify(newUser));
+    } else {
+      // Verwijder de gebruiker uit localStorage bij uitloggen
+      localStorage.removeItem('adhd_user');
+    }
+    setUser(newUser);
+  };
 
   // Functie om de huidige gebruiker op te halen
   const fetchCurrentUser = async () => {
@@ -62,10 +86,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (response.ok) {
         const userData = await response.json();
         console.log('Gebruiker succesvol opgehaald:', userData);
-        setUser(userData);
+        updateUser(userData);
       } else {
         console.log('Geen gebruiker gevonden in sessie');
-        setUser(null);
+        updateUser(null);
       }
     } catch (err) {
       console.error('Fout bij ophalen gebruiker:', err);

@@ -35,16 +35,16 @@ export function setupAuth(app: Express) {
   
   // Session configuratie
   const sessionConfig: session.SessionOptions = {
-    name: 'adhd.sid',
+    name: 'adhdsupport',
     secret: process.env.SESSION_SECRET || 'adhd-support-secret-key',
-    resave: true, // Belangrijk: voorkomt sessie expiratie tussen requesten
-    saveUninitialized: true, // Belangrijk voor het instellen van cookie bij eerste request
+    resave: true, 
+    saveUninitialized: true,
     cookie: {
       path: '/',
       httpOnly: true,
-      // Geen secure of domain attributen zodat de cookie werkt met Replit URL's
-      maxAge: 7 * 24 * 60 * 60 * 1000, // 1 week
-      sameSite: 'lax' // Veiliger standaardoptie
+      secure: false, // Geen HTTPS in Replit development
+      maxAge: 2 * 60 * 60 * 1000, // 2 uur
+      sameSite: 'lax'
     },
     rolling: true, // Verlengt de sessie bij elke request
     store: storage.sessionStore
@@ -159,7 +159,7 @@ export function setupAuth(app: Express) {
         return res.status(500).json({ message: "Uitloggen mislukt" });
       }
       
-      res.clearCookie('adhd.sid');
+      res.clearCookie('adhdsupport');
       return res.status(200).json({ message: "Succesvol uitgelogd" });
     });
   });
