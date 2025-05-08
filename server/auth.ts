@@ -42,9 +42,9 @@ export function setupAuth(app: Express) {
     cookie: {
       path: '/',
       httpOnly: true,
-      secure: true, // Nodig omdat we sameSite: 'none' gebruiken
+      // Geen secure of domain attributen zodat de cookie werkt met Replit URL's
       maxAge: 7 * 24 * 60 * 60 * 1000, // 1 week
-      sameSite: 'none' // Belangrijk: werkt beter met iframe-gebaseerde omgevingen zoals Replit
+      sameSite: 'lax' // Veiliger standaardoptie
     },
     rolling: true, // Verlengt de sessie bij elke request
     store: storage.sessionStore
@@ -118,6 +118,9 @@ export function setupAuth(app: Express) {
   });
 
   app.post("/api/login", (req: Request, res: Response, next: NextFunction) => {
+    console.log("POST /api/login - Begin auth poging - Session ID:", req.sessionID);
+    console.log("POST /api/login - Request cookies:", req.headers.cookie);
+    
     passport.authenticate("local", (err: any, user: any, info: any) => {
       if (err) {
         console.error("Login error:", err);
@@ -125,14 +128,22 @@ export function setupAuth(app: Express) {
       }
       
       if (!user) {
+        console.log("POST /api/login - Ongeldige inloggegevens");
         return res.status(400).json({ message: "Ongeldige inloggegevens" });
       }
+      
+      console.log("POST /api/login - Authenticatie succesvol, login gebruiker:", user.username);
       
       req.login(user, (err) => {
         if (err) {
           console.error("Login sessiefout:", err);
           return next(err);
         }
+        
+        // Controleer req.session na login
+        console.log("POST /api/login - Login voltooid - Session ID:", req.sessionID);
+        console.log("POST /api/login - Session na login:", req.session);
+        console.log("POST /api/login - isAuthenticated na login:", req.isAuthenticated());
         
         // Stuur respons met gebruiker (zonder wachtwoord)
         const { password, ...userWithoutPassword } = user;
@@ -154,12 +165,19 @@ export function setupAuth(app: Express) {
   });
 
   app.get("/api/user", (req: Request, res: Response) => {
+    console.log("GET /api/user - Session ID:", req.sessionID);
+    console.log("GET /api/user - isAuthenticated:", req.isAuthenticated());
+    console.log("GET /api/user - Session:", req.session);
+    console.log("GET /api/user - User:", req.user);
+    
     if (!req.isAuthenticated()) {
+      console.log("GET /api/user - Gebruiker niet ingelogd");
       return res.status(401).json({ message: "Niet ingelogd" });
     }
     
     // Retourneer de gebruiker zonder wachtwoord
     const { password, ...userWithoutPassword } = req.user as SelectUser;
+    console.log("GET /api/user - Succesvol, stuur gebruiker terug:", userWithoutPassword);
     res.status(200).json(userWithoutPassword);
   });
 

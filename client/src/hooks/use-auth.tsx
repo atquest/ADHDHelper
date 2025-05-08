@@ -33,18 +33,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const fetchCurrentUser = async () => {
     try {
       setIsLoading(true);
-      const response = await fetch('/api/user', { 
+      
+      // Voor debugging, eerst de sessie-check aanroepen om te zien wat er in sessie zit
+      const debugResponse = await fetch('/api/session-check', { 
         credentials: 'include',
         headers: {
-          'Cache-Control': 'no-cache',
+          'Accept': 'application/json',
+          'Cache-Control': 'no-cache, no-store',
           'Pragma': 'no-cache'
         }
       });
       
+      const debugData = await debugResponse.json();
+      console.log('Sessie-status bij startup:', debugData);
+      
+      // Nu de gebruiker ophalen
+      const response = await fetch('/api/user', { 
+        credentials: 'include',
+        headers: {
+          'Accept': 'application/json',
+          'Cache-Control': 'no-cache, no-store',
+          'Pragma': 'no-cache'
+        }
+      });
+      
+      console.log('Gebruiker ophalen status:', response.status);
+      
       if (response.ok) {
         const userData = await response.json();
+        console.log('Gebruiker succesvol opgehaald:', userData);
         setUser(userData);
       } else {
+        console.log('Geen gebruiker gevonden in sessie');
         setUser(null);
       }
     } catch (err) {
@@ -76,65 +96,45 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       console.log("Login poging voor:", username);
       setError(null);
       
-      // Eerst vragen we een sessie-cookie aan voor de eerste request
-      await fetch('/api/session-check', {
-        credentials: 'include',
-        headers: {
-          'Accept': 'application/json',
-          'Cache-Control': 'no-cache, no-store',
-          'Pragma': 'no-cache'
-        }
-      });
-      
-      // Dan doen we de login
+      // We gebruiken een eenvoudigere aanpak zonder extra verificaties om foutbronnen te minimaliseren
       const response = await fetch('/api/login', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'Cache-Control': 'no-cache, no-store',
-          'Pragma': 'no-cache'
         },
         body: JSON.stringify({ username, password }),
         credentials: 'include'
       });
       
+      // Controleer respons
+      console.log("Login response status:", response.status);
+      console.log("Login response cookies:", document.cookie);
+      
       if (!response.ok) {
         const errorData = await response.json();
+        console.error("Login mislukt met foutbericht:", errorData);
         throw new Error(errorData.message || 'Inloggen mislukt');
       }
       
       const userData = await response.json();
-      console.log("Login geslaagd, gebruikersdata:", userData);
+      console.log("Login gegevens ontvangen, gebruiker:", userData);
       
-      // Verifieer dat we daadwerkelijk zijn ingelogd door een aparte API-aanroep te doen
-      const verifyResponse = await fetch('/api/user', {
-        credentials: 'include',
-        headers: {
-          'Accept': 'application/json',
-          'Cache-Control': 'no-cache, no-store',
-          'Pragma': 'no-cache'
-        }
+      // Stel de gebruiker direct in
+      setUser(userData);
+      
+      toast({
+        title: 'Ingelogd',
+        description: `Welkom terug, ${userData.username}!`,
       });
       
-      if (verifyResponse.ok) {
-        const verifiedUser = await verifyResponse.json();
-        console.log("Sessie geverifieerd, gebruiker:", verifiedUser);
-        setUser(verifiedUser);
-        
-        toast({
-          title: 'Ingelogd',
-          description: `Welkom terug, ${verifiedUser.username}!`,
-        });
-        
-        // Navigeer naar de homepage met een korte vertraging
-        setTimeout(() => {
-          window.location.href = '/';
-        }, 300);
-      } else {
-        console.error("Sessie verificatie mislukt na login");
-        throw new Error("Sessie verificatie mislukt na login");
-      }
+      console.log("Navigatie naar homepage voorbereiden...");
+      
+      // Een vertraging toevoegen zodat de sessie-cookie kan worden opgeslagen
+      setTimeout(() => {
+        console.log("Nu navigeren naar homepage...");
+        // Alternatieve methode om naar de homepage te navigeren
+        document.location.href = '/';
+      }, 1000);
     } catch (err) {
       console.error('Login fout:', err);
       setError(err instanceof Error ? err : new Error('Onbekende fout bij inloggen'));
@@ -152,65 +152,44 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       console.log("Registratie poging voor:", username);
       setError(null);
       
-      // Eerst vragen we een sessie-cookie aan voor de eerste request
-      await fetch('/api/session-check', {
-        credentials: 'include',
-        headers: {
-          'Accept': 'application/json',
-          'Cache-Control': 'no-cache, no-store',
-          'Pragma': 'no-cache'
-        }
-      });
-      
-      // Dan doen we de registratie
+      // We gebruiken een eenvoudigere aanpak zonder extra verificaties
       const response = await fetch('/api/register', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'Cache-Control': 'no-cache, no-store',
-          'Pragma': 'no-cache'
         },
         body: JSON.stringify({ username, password }),
         credentials: 'include'
       });
       
+      // Controleer respons
+      console.log("Registratie response status:", response.status);
+      console.log("Registratie response cookies:", document.cookie);
+      
       if (!response.ok) {
         const errorData = await response.json();
+        console.error("Registratie mislukt met foutbericht:", errorData);
         throw new Error(errorData.message || 'Registreren mislukt');
       }
       
       const userData = await response.json();
-      console.log("Registratie geslaagd, gebruikersdata:", userData);
+      console.log("Registratie gegevens ontvangen, gebruiker:", userData);
       
-      // Verifieer dat we daadwerkelijk zijn ingelogd door een aparte API-aanroep te doen
-      const verifyResponse = await fetch('/api/user', {
-        credentials: 'include',
-        headers: {
-          'Accept': 'application/json',
-          'Cache-Control': 'no-cache, no-store',
-          'Pragma': 'no-cache'
-        }
+      // Stel de gebruiker direct in
+      setUser(userData);
+      
+      toast({
+        title: 'Account aangemaakt',
+        description: `Welkom bij ADHD Support, ${userData.username}!`,
       });
       
-      if (verifyResponse.ok) {
-        const verifiedUser = await verifyResponse.json();
-        console.log("Sessie geverifieerd na registratie, gebruiker:", verifiedUser);
-        setUser(verifiedUser);
-        
-        toast({
-          title: 'Account aangemaakt',
-          description: `Welkom bij ADHD Support, ${verifiedUser.username}!`,
-        });
-        
-        // Navigeer naar de homepage met een korte vertraging
-        setTimeout(() => {
-          window.location.href = '/';
-        }, 300);
-      } else {
-        console.error("Sessie verificatie mislukt na registratie");
-        throw new Error("Sessie verificatie mislukt na registratie");
-      }
+      console.log("Navigatie naar homepage voorbereiden na registratie...");
+      
+      // Een langere vertraging voor registratie om te verzekeren dat de sessie is ingesteld
+      setTimeout(() => {
+        console.log("Nu navigeren naar homepage (na registratie)...");
+        document.location.href = '/';
+      }, 1000);
     } catch (err) {
       console.error('Registratie fout:', err);
       setError(err instanceof Error ? err : new Error('Onbekende fout bij registreren'));
