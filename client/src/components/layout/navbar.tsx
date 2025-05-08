@@ -30,7 +30,8 @@ import { cn } from "@/lib/utils";
 export default function Navbar() {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const { user, logoutMutation } = useAuth();
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const { user, logout } = useAuth();
   const [location, navigate] = useLocation();
   
   const isActive = (path: string) => location === path;
@@ -39,6 +40,18 @@ export default function Navbar() {
     e.preventDefault();
     console.log(`Searching for: ${searchQuery}`);
     setIsSearchOpen(false);
+  };
+
+  const handleLogout = async () => {
+    try {
+      setIsLoggingOut(true);
+      await logout();
+      // logout functie handelt al de redirect naar /auth
+    } catch (error) {
+      console.error("Logout error:", error);
+    } finally {
+      setIsLoggingOut(false);
+    }
   };
 
   return (
@@ -158,11 +171,11 @@ export default function Navbar() {
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem 
-                      onClick={() => logoutMutation.mutate()}
-                      disabled={logoutMutation.isPending}
+                      onClick={handleLogout}
+                      disabled={isLoggingOut}
                     >
                       <LogOut className="mr-2 h-4 w-4" />
-                      <span>{logoutMutation.isPending ? "Logging out..." : "Log out"}</span>
+                      <span>{isLoggingOut ? "Logging out..." : "Log out"}</span>
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
