@@ -5,177 +5,202 @@ import {
   UseMutationResult,
 } from "@tanstack/react-query";
 import { insertUserSchema, User as SelectUser, InsertUser } from "@shared/schema";
-import { getQueryFn, apiRequest, queryClient } from "../lib/queryClient";
+import { apiRequest, queryClient } from "../lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 
+// Type definities
+type UserWithoutPassword = Omit<SelectUser, "password">;
+
 type AuthContextType = {
-  user: SelectUser | null;
+  user: UserWithoutPassword | null;
   isLoading: boolean;
   error: Error | null;
-  loginMutation: UseMutationResult<SelectUser, Error, LoginData>;
-  logoutMutation: UseMutationResult<void, Error, void>;
-  registerMutation: UseMutationResult<SelectUser, Error, InsertUser>;
+  login: (username: string, password: string) => Promise<void>;
+  register: (username: string, password: string) => Promise<void>;
+  logout: () => Promise<void>;
 };
 
-type LoginData = Pick<InsertUser, "username" | "password">;
-
-// Create a default context value to prevent the "useAuth must be used within an AuthProvider" error
-const defaultContextValue: AuthContextType = {
-  user: null,
-  isLoading: false,
-  error: null,
-  loginMutation: {
-    mutate: () => {},
-    mutateAsync: async () => { throw new Error("Not implemented"); },
-    isPending: false,
-    isError: false,
-    isSuccess: false,
-    isIdle: true,
-    error: null,
-    data: undefined,
-    failureCount: 0,
-    failureReason: null,
-    status: "idle",
-    reset: () => {},
-    variables: undefined,
-  } as any,
-  logoutMutation: {
-    mutate: () => {},
-    mutateAsync: async () => { throw new Error("Not implemented"); },
-    isPending: false,
-    isError: false,
-    isSuccess: false,
-    isIdle: true,
-    error: null,
-    data: undefined,
-    failureCount: 0,
-    failureReason: null,
-    status: "idle",
-    reset: () => {},
-    variables: undefined,
-  } as any,
-  registerMutation: {
-    mutate: () => {},
-    mutateAsync: async () => { throw new Error("Not implemented"); },
-    isPending: false,
-    isError: false,
-    isSuccess: false,
-    isIdle: true,
-    error: null,
-    data: undefined,
-    failureCount: 0,
-    failureReason: null,
-    status: "idle",
-    reset: () => {},
-    variables: undefined,
-  } as any,
-};
-
-export const AuthContext = createContext<AuthContextType>(defaultContextValue);
+// Creëer de context
+const AuthContext = createContext<AuthContextType | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const { toast } = useToast();
-  const {
-    data: user,
-    error,
+  const [isLoading, setIsLoading] = useState(true);
+  const [user, setUser] = useState<UserWithoutPassword | null>(null);
+  const [error, setError] = useState<Error | null>(null);
+
+  // Functie om de huidige gebruiker op te halen
+  const fetchCurrentUser = async () => {
+    try {
+      setIsLoading(true);
+      const response = await fetch('/api/user', { 
+        credentials: 'include',
+        headers: {
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache'
+        }
+      });
+      
+      if (response.ok) {
+        const userData = await response.json();
+        setUser(userData);
+      } else {
+        setUser(null);
+      }
+    } catch (err) {
+      console.error('Fout bij ophalen gebruiker:', err);
+      setUser(null);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Haal de huidige gebruiker op bij het laden
+  useEffect(() => {
+    fetchCurrentUser();
+    
+    // Ping de sessie elke 5 minuten om deze actief te houden
+    const interval = setInterval(() => {
+      if (user) {
+        fetch('/api/session-check', { credentials: 'include' })
+          .catch(err => console.error('Sessie ping mislukt:', err));
+      }
+    }, 5 * 60 * 1000);
+    
+    return () => clearInterval(interval);
+  }, [user]);
+
+  // Login functie
+  const login = async (username: string, password: string) => {
+    try {
+      setError(null);
+      const response = await fetch('/api/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ username, password }),
+        credentials: 'include'
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Inloggen mislukt');
+      }
+      
+      const userData = await response.json();
+      setUser(userData);
+      
+      toast({
+        title: 'Ingelogd',
+        description: `Welkom terug, ${userData.username}!`,
+      });
+      
+      // Navigeer naar de homepage
+      window.location.href = '/';
+    } catch (err) {
+      console.error('Login fout:', err);
+      setError(err instanceof Error ? err : new Error('Onbekende fout bij inloggen'));
+      toast({
+        title: 'Login mislukt',
+        description: err instanceof Error ? err.message : 'Onbekende fout bij inloggen',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  // Registratie functie
+  const register = async (username: string, password: string) => {
+    try {
+      setError(null);
+      const response = await fetch('/api/register', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ username, password }),
+        credentials: 'include'
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Registreren mislukt');
+      }
+      
+      const userData = await response.json();
+      setUser(userData);
+      
+      toast({
+        title: 'Account aangemaakt',
+        description: `Welkom bij ADHD Support, ${userData.username}!`,
+      });
+      
+      // Navigeer naar de homepage
+      window.location.href = '/';
+    } catch (err) {
+      console.error('Registratie fout:', err);
+      setError(err instanceof Error ? err : new Error('Onbekende fout bij registreren'));
+      toast({
+        title: 'Registratie mislukt',
+        description: err instanceof Error ? err.message : 'Onbekende fout bij registreren',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  // Logout functie
+  const logout = async () => {
+    try {
+      const response = await fetch('/api/logout', {
+        method: 'POST',
+        credentials: 'include'
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Uitloggen mislukt');
+      }
+      
+      setUser(null);
+      
+      toast({
+        title: 'Uitgelogd',
+        description: 'Je bent succesvol uitgelogd.',
+      });
+      
+      // Navigeer naar de login pagina
+      window.location.href = '/auth';
+    } catch (err) {
+      console.error('Logout fout:', err);
+      toast({
+        title: 'Uitloggen mislukt',
+        description: err instanceof Error ? err.message : 'Onbekende fout bij uitloggen',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const contextValue: AuthContextType = {
+    user,
     isLoading,
-    refetch,
-  } = useQuery<SelectUser | undefined, Error>({
-    queryKey: ["/api/user"],
-    queryFn: getQueryFn({ on401: "returnNull" }),
-    retry: false,
-    refetchOnWindowFocus: true, // Refetch when window gets focus
-    refetchInterval: 5 * 60 * 1000, // Refetch every 5 minutes to keep session alive
-  });
-
-  const loginMutation = useMutation({
-    mutationFn: async (credentials: LoginData) => {
-      const res = await apiRequest("POST", "/api/login", credentials);
-      return await res.json();
-    },
-    onSuccess: (user: SelectUser) => {
-      queryClient.setQueryData(["/api/user"], user);
-      refetch(); // Explicitly refetch to ensure we get the latest data
-      
-      // Programmatically navigate to homepage after successful login
-      window.location.href = "/";
-      
-      toast({
-        title: "Ingelogd",
-        description: `Welkom terug, ${user.username}!`,
-      });
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Login mislukt",
-        description: error.message,
-        variant: "destructive",
-      });
-    },
-  });
-
-  const registerMutation = useMutation({
-    mutationFn: async (credentials: InsertUser) => {
-      const res = await apiRequest("POST", "/api/register", credentials);
-      return await res.json();
-    },
-    onSuccess: (user: SelectUser) => {
-      queryClient.setQueryData(["/api/user"], user);
-      refetch(); // Explicitly refetch to ensure we get the latest data
-      
-      // Programmatically navigate to homepage after successful registration
-      window.location.href = "/";
-      
-      toast({
-        title: "Account aangemaakt",
-        description: `Welkom bij ADHD Support, ${user.username}!`,
-      });
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Registratie mislukt",
-        description: error.message,
-        variant: "destructive",
-      });
-    },
-  });
-
-  const logoutMutation = useMutation({
-    mutationFn: async () => {
-      await apiRequest("POST", "/api/logout");
-    },
-    onSuccess: () => {
-      queryClient.setQueryData(["/api/user"], null);
-      toast({
-        title: "Uitgelogd",
-        description: "Je bent succesvol uitgelogd.",
-      });
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Uitloggen mislukt",
-        description: error.message,
-        variant: "destructive",
-      });
-    },
-  });
+    error,
+    login,
+    register,
+    logout
+  };
 
   return (
-    <AuthContext.Provider
-      value={{
-        user: user ?? null,
-        isLoading,
-        error,
-        loginMutation,
-        logoutMutation,
-        registerMutation,
-      }}
-    >
+    <AuthContext.Provider value={contextValue}>
       {children}
     </AuthContext.Provider>
   );
 }
 
+// Hook om de auth context te gebruiken
 export function useAuth() {
-  return useContext(AuthContext);
+  const context = useContext(AuthContext);
+  if (!context) {
+    throw new Error('useAuth moet binnen een AuthProvider worden gebruikt');
+  }
+  return context;
 }

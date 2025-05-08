@@ -1,6 +1,6 @@
 import passport from "passport";
 import { Strategy as LocalStrategy } from "passport-local";
-import { Express } from "express";
+import { Express, Request, Response, NextFunction } from "express";
 import session from "express-session";
 import { scrypt, randomBytes, timingSafeEqual } from "crypto";
 import { promisify } from "util";
@@ -29,151 +29,146 @@ async function comparePasswords(supplied: string, stored: string) {
 }
 
 export function setupAuth(app: Express) {
+  // Productie detectie
   const isProduction = process.env.NODE_ENV === 'production';
+  const domain = isProduction ? 'your-domain.com' : undefined;
   
-  const sessionSettings: session.SessionOptions = {
-    secret: process.env.SESSION_SECRET || 'adhd-support-session-secret',
+  // Session configuratie
+  const sessionConfig: session.SessionOptions = {
+    name: 'adhd.sid',
+    secret: process.env.SESSION_SECRET || 'adhd-support-secret-key',
     resave: false,
     saveUninitialized: false,
-    store: storage.sessionStore,
     cookie: {
-      maxAge: 1000 * 60 * 60 * 24 * 7, // 1 week
+      path: '/',
       httpOnly: true,
-      // In production, secure zou true moeten zijn
-      secure: isProduction,
-      sameSite: isProduction ? 'none' : 'lax',
-      path: '/'
+      secure: false, // alleen true in productie met HTTPS
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 1 week
+      sameSite: 'lax'
     },
-    name: 'adhd-support.sid',
-    rolling: true // Forceer verlenging van sessie bij elke request
+    store: storage.sessionStore
   };
 
-  app.set("trust proxy", 1);
-  app.use(session(sessionSettings));
+  app.set('trust proxy', 1);
+  app.use(session(sessionConfig));
   app.use(passport.initialize());
   app.use(passport.session());
 
-  passport.use(
-    new LocalStrategy(async (username, password, done) => {
+  // Passport configuratie
+  passport.use(new LocalStrategy(async (username, password, done) => {
+    try {
       const user = await storage.getUserByUsername(username);
       if (!user || !(await comparePasswords(password, user.password))) {
         return done(null, false);
-      } else {
-        return done(null, user);
       }
-    }),
-  );
-
-  passport.serializeUser((user, done) => done(null, user.id));
-  passport.deserializeUser(async (id: number, done) => {
-    const user = await storage.getUser(id);
-    if (!user) {
-      return done(new Error("User not found"), null);
+      return done(null, user);
+    } catch (error) {
+      return done(error);
     }
-    done(null, user);
+  }));
+
+  passport.serializeUser((user, done) => {
+    done(null, user.id);
   });
 
-  app.post("/api/register", async (req, res, next) => {
-    console.log("Registration attempt for user:", req.body.username);
-    console.log("Session before registration:", req.session);
-    
+  passport.deserializeUser(async (id: number, done) => {
     try {
-      // Check for existing user
+      const user = await storage.getUser(id);
+      if (!user) {
+        return done(null, false);
+      }
+      return done(null, user);
+    } catch (error) {
+      return done(error);
+    }
+  });
+
+  // API Routes
+  app.post("/api/register", async (req: Request, res: Response) => {
+    try {
+      // Controleer of gebruiker al bestaat
       const existingUser = await storage.getUserByUsername(req.body.username);
       if (existingUser) {
-        console.log("Registration failed: username already exists");
         return res.status(400).json({ message: "Gebruikersnaam bestaat al" });
       }
-    
-      // Create the user with hashed password
+
+      // Maak de gebruiker aan
+      const hashedPassword = await hashPassword(req.body.password);
       const user = await storage.createUser({
         ...req.body,
-        password: await hashPassword(req.body.password),
+        password: hashedPassword
       });
 
-      console.log("User created successfully:", user.username);
-      console.log("Session ID before login:", req.sessionID);
-      
-      // Log user in to the session
+      // Log de gebruiker in
       req.login(user, (err) => {
         if (err) {
-          console.error("Error logging in after register:", err);
-          return res.status(500).json({ message: "Fout bij inloggen na registratie" });
+          console.error("Login na registratie mislukt:", err);
+          return res.status(500).json({ message: "Inloggen na registratie mislukt" });
         }
-
-        console.log("User logged in after registration");
-        console.log("Session ID after login:", req.sessionID);
         
-        // Save the session explicitly
-        req.session.save((err) => {
-          if (err) {
-            console.error("Error saving session after register:", err);
-            return res.status(500).json({ message: "Fout bij opslaan sessie" });
-          }
-          
-          console.log("Session saved successfully after registration");
-          console.log("Final session state:", req.session);
-          return res.status(201).json(user);
-        });
+        // Stuur respons met gebruiker (zonder wachtwoord)
+        const { password, ...userWithoutPassword } = user;
+        return res.status(201).json(userWithoutPassword);
       });
     } catch (error) {
-      console.error("Error creating user:", error);
-      return res.status(500).json({ message: "Fout bij registreren" });
+      console.error("Registratie fout:", error);
+      res.status(500).json({ message: "Er is een fout opgetreden bij het registreren" });
     }
   });
 
-  app.post("/api/login", (req, res, next) => {
-    console.log("Login attempt for user:", req.body.username);
-    console.log("Session before auth:", req.session);
-    
-    passport.authenticate("local", (err: any, user: SelectUser | false, info: any) => {
+  app.post("/api/login", (req: Request, res: Response, next: NextFunction) => {
+    passport.authenticate("local", (err: any, user: any, info: any) => {
       if (err) {
         console.error("Login error:", err);
         return next(err);
       }
       
       if (!user) {
-        console.log("Login failed: Invalid credentials");
         return res.status(400).json({ message: "Ongeldige inloggegevens" });
       }
       
-      console.log("Authentication successful for user:", user.username);
-      
       req.login(user, (err) => {
         if (err) {
-          console.error("Login session error:", err);
+          console.error("Login sessiefout:", err);
           return next(err);
         }
         
-        console.log("Session ID after login:", req.sessionID);
-        console.log("User in session:", req.user);
-        
-        req.session.save((err) => {
-          if (err) {
-            console.error("Error saving session after login:", err);
-            return res.status(500).json({ error: "Session save error" });
-          }
-          
-          console.log("Session saved successfully");
-          console.log("Final session state:", req.session);
-          return res.status(200).json(user);
-        });
+        // Stuur respons met gebruiker (zonder wachtwoord)
+        const { password, ...userWithoutPassword } = user;
+        return res.status(200).json(userWithoutPassword);
       });
     })(req, res, next);
   });
 
-  app.post("/api/logout", (req, res, next) => {
+  app.post("/api/logout", (req: Request, res: Response) => {
     req.logout((err) => {
-      if (err) return next(err);
-      res.sendStatus(200);
+      if (err) {
+        console.error("Uitloggen mislukt:", err);
+        return res.status(500).json({ message: "Uitloggen mislukt" });
+      }
+      
+      res.clearCookie('adhd.sid');
+      return res.status(200).json({ message: "Succesvol uitgelogd" });
     });
   });
 
-  app.get("/api/user", (req, res) => {
-    console.log("Session ID:", req.sessionID);
-    console.log("Authenticated:", req.isAuthenticated());
-    console.log("Session:", req.session);
-    if (!req.isAuthenticated()) return res.sendStatus(401);
-    res.json(req.user);
+  app.get("/api/user", (req: Request, res: Response) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Niet ingelogd" });
+    }
+    
+    // Retourneer de gebruiker zonder wachtwoord
+    const { password, ...userWithoutPassword } = req.user as SelectUser;
+    res.status(200).json(userWithoutPassword);
+  });
+
+  // Helper route voor debug doeleinden
+  app.get("/api/session-check", (req: Request, res: Response) => {
+    res.json({
+      authenticated: req.isAuthenticated(),
+      sessionID: req.sessionID,
+      session: req.session,
+      user: req.user
+    });
   });
 }

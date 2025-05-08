@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,30 +10,47 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { insertUserSchema } from "@shared/schema";
 import { Loader2 } from "lucide-react";
 
-const loginSchema = insertUserSchema.extend({
+// Type voor login formulier
+const loginSchema = z.object({
+  username: z.string().min(1, "Gebruikersnaam is verplicht"),
+  password: z.string().min(1, "Wachtwoord is verplicht"),
   rememberMe: z.boolean().optional(),
 });
 
-const registerSchema = insertUserSchema.extend({
-  confirmPassword: z.string().min(6, {
-    message: "Password must be at least 6 characters.",
+type LoginFormValues = z.infer<typeof loginSchema>;
+
+// Type voor registratie formulier
+const registerSchema = z.object({
+  username: z.string().min(3, "Gebruikersnaam moet minimaal 3 tekens bevatten"),
+  password: z.string().min(6, "Wachtwoord moet minimaal 6 tekens bevatten"),
+  confirmPassword: z.string().min(1, "Bevestig je wachtwoord"),
+  terms: z.boolean().refine(val => val === true, {
+    message: "Je moet akkoord gaan met de voorwaarden",
   }),
-  terms: z.literal(true, {
-    errorMap: () => ({ message: "You must accept the terms and conditions" }),
-  }),
-}).refine((data) => data.password === data.confirmPassword, {
-  message: "Passwords don't match",
+}).refine(data => data.password === data.confirmPassword, {
+  message: "Wachtwoorden komen niet overeen",
   path: ["confirmPassword"],
 });
 
+type RegisterFormValues = z.infer<typeof registerSchema>;
+
 export default function AuthPage() {
   const [activeTab, setActiveTab] = useState<"login" | "register">("login");
-  const { loginMutation, registerMutation } = useAuth();
+  const { user, isLoading, login, register } = useAuth();
+  const [isPendingLogin, setIsPendingLogin] = useState(false);
+  const [isPendingRegister, setIsPendingRegister] = useState(false);
 
-  const loginForm = useForm<z.infer<typeof loginSchema>>({
+  // Als gebruiker al is ingelogd, doorsturen naar homepage
+  useEffect(() => {
+    if (user && !isLoading) {
+      window.location.href = "/";
+    }
+  }, [user, isLoading]);
+
+  // Login formulier
+  const loginForm = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
       username: "",
@@ -42,28 +59,41 @@ export default function AuthPage() {
     },
   });
 
-  const registerForm = useForm<z.infer<typeof registerSchema>>({
+  // Registratie formulier
+  const registerForm = useForm<RegisterFormValues>({
     resolver: zodResolver(registerSchema),
     defaultValues: {
       username: "",
       password: "",
       confirmPassword: "",
-      terms: false as any, // Type assertion to fix type issue
+      terms: false,
     },
   });
 
-  const onLoginSubmit = (values: z.infer<typeof loginSchema>) => {
-    loginMutation.mutate({
-      username: values.username,
-      password: values.password,
-    });
+  // Login verwerken
+  const onLoginSubmit = async (values: LoginFormValues) => {
+    try {
+      setIsPendingLogin(true);
+      await login(values.username, values.password);
+      // Na succesvol inloggen wordt redirect gedaan in useAuth
+    } catch (error) {
+      console.error("Login formulier fout:", error);
+    } finally {
+      setIsPendingLogin(false);
+    }
   };
 
-  const onRegisterSubmit = (values: z.infer<typeof registerSchema>) => {
-    registerMutation.mutate({
-      username: values.username,
-      password: values.password,
-    });
+  // Registratie verwerken
+  const onRegisterSubmit = async (values: RegisterFormValues) => {
+    try {
+      setIsPendingRegister(true);
+      await register(values.username, values.password);
+      // Na succesvolle registratie wordt redirect gedaan in useAuth
+    } catch (error) {
+      console.error("Registratie formulier fout:", error);
+    } finally {
+      setIsPendingRegister(false);
+    }
   };
 
   return (
@@ -72,14 +102,14 @@ export default function AuthPage() {
         <Card className="w-full max-w-md">
           <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as "login" | "register")}>
             <TabsList className="grid w-full grid-cols-2 mb-4">
-              <TabsTrigger value="login">Login</TabsTrigger>
-              <TabsTrigger value="register">Register</TabsTrigger>
+              <TabsTrigger value="login">Inloggen</TabsTrigger>
+              <TabsTrigger value="register">Registreren</TabsTrigger>
             </TabsList>
             
             <TabsContent value="login">
               <CardHeader>
-                <CardTitle>Login to ADHD Support</CardTitle>
-                <CardDescription>Enter your credentials to access your account</CardDescription>
+                <CardTitle>Log in bij ADHD Support</CardTitle>
+                <CardDescription>Voer je gegevens in om toegang te krijgen tot je account</CardDescription>
               </CardHeader>
               <CardContent>
                 <Form {...loginForm}>
@@ -89,9 +119,9 @@ export default function AuthPage() {
                       name="username"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Username</FormLabel>
+                          <FormLabel>Gebruikersnaam</FormLabel>
                           <FormControl>
-                            <Input placeholder="Your username" {...field} />
+                            <Input placeholder="Jouw gebruikersnaam" {...field} />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -103,9 +133,9 @@ export default function AuthPage() {
                       name="password"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Password</FormLabel>
+                          <FormLabel>Wachtwoord</FormLabel>
                           <FormControl>
-                            <Input type="password" placeholder="Your password" {...field} />
+                            <Input type="password" placeholder="Jouw wachtwoord" {...field} />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -124,28 +154,28 @@ export default function AuthPage() {
                                 onCheckedChange={field.onChange}
                               />
                             </FormControl>
-                            <FormLabel className="text-sm font-normal">Remember me</FormLabel>
+                            <FormLabel className="text-sm font-normal">Onthoud mij</FormLabel>
                           </FormItem>
                         )}
                       />
                       
                       <Button variant="link" className="p-0 h-auto text-sm">
-                        Forgot password?
+                        Wachtwoord vergeten?
                       </Button>
                     </div>
                     
                     <Button 
                       type="submit" 
                       className="w-full" 
-                      disabled={loginMutation.isPending}
+                      disabled={isPendingLogin}
                     >
-                      {loginMutation.isPending ? (
+                      {isPendingLogin ? (
                         <>
                           <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          Logging in...
+                          Inloggen...
                         </>
                       ) : (
-                        "Login"
+                        "Inloggen"
                       )}
                     </Button>
                   </form>
@@ -158,7 +188,7 @@ export default function AuthPage() {
                     </div>
                     <div className="relative flex justify-center text-sm">
                       <span className="px-2 bg-background text-muted-foreground">
-                        Don't have an account?
+                        Heb je nog geen account?
                       </span>
                     </div>
                   </div>
@@ -168,7 +198,7 @@ export default function AuthPage() {
                     className="w-full mt-6"
                     onClick={() => setActiveTab("register")}
                   >
-                    Create an account
+                    Maak een account aan
                   </Button>
                 </div>
               </CardContent>
@@ -176,8 +206,8 @@ export default function AuthPage() {
             
             <TabsContent value="register">
               <CardHeader>
-                <CardTitle>Create an account</CardTitle>
-                <CardDescription>Enter your details to register</CardDescription>
+                <CardTitle>Maak een account aan</CardTitle>
+                <CardDescription>Voer je gegevens in om te registreren</CardDescription>
               </CardHeader>
               <CardContent>
                 <Form {...registerForm}>
@@ -187,9 +217,9 @@ export default function AuthPage() {
                       name="username"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Username</FormLabel>
+                          <FormLabel>Gebruikersnaam</FormLabel>
                           <FormControl>
-                            <Input placeholder="Choose a username" {...field} />
+                            <Input placeholder="Kies een gebruikersnaam" {...field} />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -201,9 +231,9 @@ export default function AuthPage() {
                       name="password"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Password</FormLabel>
+                          <FormLabel>Wachtwoord</FormLabel>
                           <FormControl>
-                            <Input type="password" placeholder="Create a password" {...field} />
+                            <Input type="password" placeholder="Maak een wachtwoord" {...field} />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -215,9 +245,9 @@ export default function AuthPage() {
                       name="confirmPassword"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Confirm Password</FormLabel>
+                          <FormLabel>Bevestig Wachtwoord</FormLabel>
                           <FormControl>
-                            <Input type="password" placeholder="Confirm your password" {...field} />
+                            <Input type="password" placeholder="Bevestig je wachtwoord" {...field} />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -237,7 +267,7 @@ export default function AuthPage() {
                           </FormControl>
                           <div className="space-y-1 leading-none">
                             <FormLabel className="text-sm font-normal">
-                              I agree to the <Button variant="link" className="p-0 h-auto">terms</Button> and <Button variant="link" className="p-0 h-auto">privacy policy</Button>
+                              Ik ga akkoord met de <Button variant="link" className="p-0 h-auto">voorwaarden</Button> en <Button variant="link" className="p-0 h-auto">privacy policy</Button>
                             </FormLabel>
                             <FormMessage />
                           </div>
@@ -248,15 +278,15 @@ export default function AuthPage() {
                     <Button 
                       type="submit" 
                       className="w-full"
-                      disabled={registerMutation.isPending}
+                      disabled={isPendingRegister}
                     >
-                      {registerMutation.isPending ? (
+                      {isPendingRegister ? (
                         <>
                           <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          Creating account...
+                          Account aanmaken...
                         </>
                       ) : (
-                        "Create account"
+                        "Account aanmaken"
                       )}
                     </Button>
                   </form>
@@ -269,7 +299,7 @@ export default function AuthPage() {
                     </div>
                     <div className="relative flex justify-center text-sm">
                       <span className="px-2 bg-background text-muted-foreground">
-                        Already have an account?
+                        Heb je al een account?
                       </span>
                     </div>
                   </div>
@@ -279,7 +309,7 @@ export default function AuthPage() {
                     className="w-full mt-6"
                     onClick={() => setActiveTab("login")}
                   >
-                    Login
+                    Inloggen
                   </Button>
                 </div>
               </CardContent>
@@ -290,10 +320,10 @@ export default function AuthPage() {
       
       <div className="w-full lg:w-1/2 p-8 bg-gradient-to-r from-primary to-[#6D28D9] text-white flex items-center justify-center hidden lg:flex">
         <div className="max-w-lg">
-          <h1 className="text-4xl font-bold mb-6">Welcome to ADHD Support</h1>
+          <h1 className="text-4xl font-bold mb-6">Welkom bij ADHD Support</h1>
           <p className="text-xl mb-8">
-            A comprehensive platform with information, techniques, and tips to
-            help understand and manage ADHD symptoms.
+            Een uitgebreid platform met informatie, technieken en tips om
+            ADHD-symptomen beter te begrijpen en te beheren.
           </p>
           
           <div className="space-y-4">
@@ -304,9 +334,9 @@ export default function AuthPage() {
                 </svg>
               </div>
               <div className="ml-3">
-                <h3 className="text-lg font-medium">Symptom Information</h3>
+                <h3 className="text-lg font-medium">Symptoom Informatie</h3>
                 <p className="mt-1 text-base text-white text-opacity-80">
-                  Detailed explanations about ADHD symptoms and how they affect daily life.
+                  Gedetailleerde uitleg over ADHD-symptomen en hoe deze het dagelijks leven beïnvloeden.
                 </p>
               </div>
             </div>
@@ -318,9 +348,9 @@ export default function AuthPage() {
                 </svg>
               </div>
               <div className="ml-3">
-                <h3 className="text-lg font-medium">Management Techniques</h3>
+                <h3 className="text-lg font-medium">Beheertechnieken</h3>
                 <p className="mt-1 text-base text-white text-opacity-80">
-                  Proven techniques to help manage ADHD symptoms in different situations.
+                  Bewezen technieken om ADHD-symptomen in verschillende situaties te beheren.
                 </p>
               </div>
             </div>
@@ -332,9 +362,9 @@ export default function AuthPage() {
                 </svg>
               </div>
               <div className="ml-3">
-                <h3 className="text-lg font-medium">Regular Helpful Tips</h3>
+                <h3 className="text-lg font-medium">Regelmatige Nuttige Tips</h3>
                 <p className="mt-1 text-base text-white text-opacity-80">
-                  Receive useful tips and reminders to help maintain focus and organization.
+                  Ontvang bruikbare tips en herinneringen om focus en organisatie te behouden.
                 </p>
               </div>
             </div>
