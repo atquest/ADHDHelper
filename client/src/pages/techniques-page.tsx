@@ -1,7 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import TechniqueCard from "@/components/techniques/technique-card";
-import { techniques } from "@/data/adhd-data";
 import { 
   Select, 
   SelectContent, 
@@ -10,7 +9,9 @@ import {
   SelectValue 
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
-import { Search } from "lucide-react";
+import { Search, Loader2 } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { type Technique } from "@shared/schema";
 
 type CategoryFilter = "" | "focus" | "organization" | "impulse" | "hyperactivity" | "emotional" | "social";
 type DifficultyFilter = "" | "easy" | "medium" | "hard";
@@ -23,35 +24,73 @@ export default function TechniquesPage() {
   const [sortOption, setSortOption] = useState<SortOption>("newest");
   const [, navigate] = useLocation();
 
-  const filteredAndSortedTechniques = techniques
-    .filter(technique => {
-      // Apply category filter
-      const categoryMatch = categoryFilter === "" || technique.categories.includes(categoryFilter);
+  // Fetch techniques from API
+  const { 
+    data: techniques, 
+    isLoading,
+    error,
+    refetch
+  } = useQuery<Technique[]>({
+    queryKey: ["/api/techniques", categoryFilter, difficultyFilter],
+    queryFn: async ({ queryKey }) => {
+      const categoryId = queryKey[1] as string;
+      const difficulty = queryKey[2] as string;
       
-      // Apply difficulty filter
-      const difficultyMatch = difficultyFilter === "" || technique.difficulty === difficultyFilter;
+      let url = '/api/techniques';
+      const params = new URLSearchParams();
       
-      // Apply search query
-      const searchMatch = technique.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                          technique.description.toLowerCase().includes(searchQuery.toLowerCase());
-      
-      return categoryMatch && difficultyMatch && searchMatch;
-    })
-    .sort((a, b) => {
-      // Apply sorting
-      switch (sortOption) {
-        case "newest":
-          return b.id - a.id;
-        case "oldest":
-          return a.id - b.id;
-        case "az":
-          return a.title.localeCompare(b.title);
-        case "za":
-          return b.title.localeCompare(a.title);
-        default:
-          return 0;
+      if (categoryId) {
+        params.append('categoryId', categoryId);
       }
-    });
+      
+      if (difficulty) {
+        params.append('difficulty', difficulty);
+      }
+      
+      if (params.toString()) {
+        url += `?${params.toString()}`;
+      }
+      
+      const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error("Failed to fetch techniques");
+      }
+      return response.json();
+    }
+  });
+
+  // Re-fetch when filters change
+  useEffect(() => {
+    refetch();
+  }, [categoryFilter, difficultyFilter, refetch]);
+
+  // Apply client-side search and sorting
+  const filteredAndSortedTechniques = techniques
+    ? techniques
+        .filter(technique => {
+          // Only apply search filter client-side since others are handled by API
+          return (
+            searchQuery === "" || 
+            technique.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
+            technique.description.toLowerCase().includes(searchQuery.toLowerCase())
+          );
+        })
+        .sort((a, b) => {
+          // Apply sorting
+          switch (sortOption) {
+            case "newest":
+              return b.id - a.id;
+            case "oldest":
+              return a.id - b.id;
+            case "az":
+              return a.title.localeCompare(b.title);
+            case "za":
+              return b.title.localeCompare(a.title);
+            default:
+              return 0;
+          }
+        })
+    : [];
 
   return (
     <div>
@@ -122,22 +161,40 @@ export default function TechniquesPage() {
         </div>
         
         {/* Techniques Grid */}
-        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {filteredAndSortedTechniques.length > 0 ? (
-            filteredAndSortedTechniques.map((technique) => (
-              <TechniqueCard
-                key={technique.id}
-                technique={technique}
-                onClick={() => navigate(`/symptoms/${technique.relatedSymptoms[0]}`)}
-              />
-            ))
-          ) : (
-            <div className="col-span-3 text-center py-12">
-              <h3 className="text-lg font-medium mb-2">No techniques found</h3>
-              <p className="text-muted-foreground">Try adjusting your search or filters</p>
-            </div>
-          )}
-        </div>
+        {isLoading ? (
+          <div className="flex items-center justify-center py-16">
+            <Loader2 className="h-10 w-10 animate-spin text-primary" />
+          </div>
+        ) : error ? (
+          <div className="bg-red-50 border border-red-200 text-red-700 p-6 rounded-md">
+            An error occurred while loading techniques. Please try again later.
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            {filteredAndSortedTechniques.length > 0 ? (
+              filteredAndSortedTechniques.map((technique) => (
+                <TechniqueCard
+                  key={technique.id}
+                  technique={{
+                    id: technique.id,
+                    title: technique.title,
+                    difficulty: technique.difficulty,
+                    mainCategory: technique.mainCategory,
+                    categoryColor: technique.categoryColor,
+                    description: technique.description,
+                    benefits: technique.benefits as string[],
+                  }}
+                  onClick={() => navigate(`/techniques/${technique.id}`)}
+                />
+              ))
+            ) : (
+              <div className="col-span-3 text-center py-12">
+                <h3 className="text-lg font-medium mb-2">No techniques found</h3>
+                <p className="text-muted-foreground">Try adjusting your search or filters</p>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

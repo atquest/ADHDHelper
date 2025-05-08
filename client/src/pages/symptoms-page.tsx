@@ -1,10 +1,9 @@
 import { useState } from "react";
 import { useLocation } from "wouter";
 import SymptomCard from "@/components/symptoms/symptom-card";
-import { symptoms } from "@/data/adhd-data";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ChevronDown, Search } from "lucide-react";
+import { ChevronDown, Search, Loader2 } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -12,25 +11,43 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
+import { useQuery } from "@tanstack/react-query";
+import { type Symptom } from "@shared/schema";
 
 type Category = "all" | "focus" | "organization" | "impulse" | "hyperactivity" | "emotional" | "social";
 
 export default function SymptomsPage() {
   const [activeCategory, setActiveCategory] = useState<Category>("all");
   const [searchQuery, setSearchQuery] = useState("");
-  const [showMoreFilters, setShowMoreFilters] = useState(false);
   const [, navigate] = useLocation();
 
-  const filteredSymptoms = symptoms.filter((symptom) => {
-    // Filter by category
-    const categoryMatch = activeCategory === "all" || symptom.categoryId === activeCategory;
-    
-    // Filter by search query
-    const searchMatch = symptom.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                        symptom.description.toLowerCase().includes(searchQuery.toLowerCase());
-    
-    return categoryMatch && searchMatch;
+  // Fetch symptoms data from API
+  const { 
+    data: symptoms, 
+    isLoading,
+    error
+  } = useQuery<Symptom[]>({
+    queryKey: ["/api/symptoms", activeCategory !== "all" ? activeCategory : null],
+    queryFn: async ({ queryKey }) => {
+      const categoryId = queryKey[1] as string | null;
+      const url = categoryId 
+        ? `/api/symptoms?categoryId=${categoryId}` 
+        : `/api/symptoms`;
+      
+      const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error("Failed to fetch symptoms");
+      }
+      return response.json();
+    }
   });
+
+  // Filter by search query
+  const filteredSymptoms = symptoms?.filter((symptom) => {
+    return searchQuery === "" || 
+           symptom.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
+           symptom.description.toLowerCase().includes(searchQuery.toLowerCase());
+  }) || [];
 
   return (
     <div>
@@ -129,38 +146,48 @@ export default function SymptomsPage() {
         </div>
         
         {/* Symptoms Cards */}
-        <div className="mt-8 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {filteredSymptoms.length > 0 ? (
-            filteredSymptoms.map((symptom) => (
-              <SymptomCard
-                key={symptom.id}
-                id={symptom.id}
-                title={symptom.title}
-                category={symptom.category}
-                description={symptom.description}
-                recognitionPoints={symptom.recognitionPoints}
-                onClick={() => navigate(`/symptoms/${symptom.id}`)}
-              />
-            ))
-          ) : (
-            <div className="col-span-3 py-12 text-center">
-              <h3 className="text-lg font-medium text-foreground mb-2">No symptoms found</h3>
-              <p className="text-muted-foreground">
-                Try adjusting your search or filter criteria
-              </p>
-              <Button 
-                variant="outline" 
-                className="mt-4"
-                onClick={() => {
-                  setActiveCategory("all");
-                  setSearchQuery("");
-                }}
-              >
-                Reset filters
-              </Button>
-            </div>
-          )}
-        </div>
+        {isLoading ? (
+          <div className="flex items-center justify-center py-16">
+            <Loader2 className="h-10 w-10 animate-spin text-primary" />
+          </div>
+        ) : error ? (
+          <div className="mt-8 bg-red-50 border border-red-200 text-red-700 p-6 rounded-md">
+            An error occurred while loading symptoms. Please try again later.
+          </div>
+        ) : (
+          <div className="mt-8 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            {filteredSymptoms.length > 0 ? (
+              filteredSymptoms.map((symptom) => (
+                <SymptomCard
+                  key={symptom.id}
+                  id={symptom.id}
+                  title={symptom.title}
+                  category={symptom.category}
+                  description={symptom.description}
+                  recognitionPoints={symptom.recognitionPoints as string[]}
+                  onClick={() => navigate(`/symptoms/${symptom.id}`)}
+                />
+              ))
+            ) : (
+              <div className="col-span-3 py-12 text-center">
+                <h3 className="text-lg font-medium text-foreground mb-2">No symptoms found</h3>
+                <p className="text-muted-foreground">
+                  Try adjusting your search or filter criteria
+                </p>
+                <Button 
+                  variant="outline" 
+                  className="mt-4"
+                  onClick={() => {
+                    setActiveCategory("all");
+                    setSearchQuery("");
+                  }}
+                >
+                  Reset filters
+                </Button>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
