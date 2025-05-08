@@ -96,6 +96,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     onSuccess: (user: SelectUser) => {
       queryClient.setQueryData(["/api/user"], user);
       refetch(); // Explicitly refetch to ensure we get the latest data
+      
+      // Programmatically navigate to homepage after successful login
+      window.location.href = "/";
+      
       toast({
         title: "Ingelogd",
         description: `Welkom terug, ${user.username}!`,
@@ -118,6 +122,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     onSuccess: (user: SelectUser) => {
       queryClient.setQueryData(["/api/user"], user);
       refetch(); // Explicitly refetch to ensure we get the latest data
+      
+      // Programmatically navigate to homepage after successful registration
+      window.location.href = "/";
+      
       toast({
         title: "Account aangemaakt",
         description: `Welkom bij ADHD Support, ${user.username}!`,

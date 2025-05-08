@@ -85,34 +85,24 @@ export function setupAuth(app: Express) {
       });
 
       console.log("User created:", user);
-      console.log("Session ID before register:", req.sessionID);
+      console.log("Session ID:", req.sessionID);
       
-      // Regenerate session to prevent session fixation
-      req.session.regenerate((err) => {
+      // Log user in to the session directly
+      req.login(user as SelectUser, (err) => {
         if (err) {
-          console.error("Error regenerating session after register:", err);
-          return res.status(500).json({ error: "Session error" });
+          console.error("Error logging in after register:", err);
+          return res.status(500).json({ error: "Login error" });
         }
-        
-        // Log user in to the new session with stored user data
-        req.login(user as SelectUser, (err) => {
+
+        // Save the session
+        req.session.save((err) => {
           if (err) {
-            console.error("Error logging in after register:", err);
-            return res.status(500).json({ error: "Login error" });
+            console.error("Error saving session after register:", err);
+            return res.status(500).json({ error: "Session save error" });
           }
-  
-          console.log("New session ID after register:", req.sessionID);
-          console.log("Session after register:", req.session);
           
-          // Save the regenerated session
-          req.session.save((err) => {
-            if (err) {
-              console.error("Error saving session after register:", err);
-              return res.status(500).json({ error: "Session save error" });
-            }
-            
-            res.status(201).json(user);
-          });
+          console.log("Session after register:", req.session);
+          res.status(201).json(user);
         });
       });
     } catch (error) {
@@ -123,38 +113,16 @@ export function setupAuth(app: Express) {
 
   app.post("/api/login", passport.authenticate("local"), (req, res) => {
     console.log("Login successful, user:", req.user);
-    console.log("Session ID before regenerate:", req.sessionID);
-    
-    // Store user data before regenerating session
-    const userData = req.user as SelectUser;
-    
-    // Regenerate session to prevent session fixation
-    req.session.regenerate((err) => {
-      if (err) {
-        console.error("Error regenerating session:", err);
-        return res.status(500).json({ error: "Session error" });
-      }
-      
-      // Log user in to the new session
-      req.login(userData, (err) => {
-        if (err) {
-          console.error("Error logging in to new session:", err);
-          return res.status(500).json({ error: "Login error" });
-        }
+    console.log("Session ID:", req.sessionID);
 
-        console.log("New session ID after regenerate:", req.sessionID);
-        console.log("Session after regenerate:", req.session);
-        
-        // Save the regenerated session
-        req.session.save((err) => {
-          if (err) {
-            console.error("Error saving regenerated session:", err);
-            return res.status(500).json({ error: "Session save error" });
-          }
-          
-          res.status(200).json(userData);
-        });
-      });
+    // Just save the current session without regeneration
+    req.session.save((err) => {
+      if (err) {
+        console.error("Error saving session:", err);
+        return res.status(500).json({ error: "Session save error" });
+      }
+      console.log("Session after login:", req.session);
+      res.status(200).json(req.user);
     });
   });
 

@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { useLocation } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -32,14 +31,7 @@ const registerSchema = insertUserSchema.extend({
 
 export default function AuthPage() {
   const [activeTab, setActiveTab] = useState<"login" | "register">("login");
-  const { user, loginMutation, registerMutation } = useAuth();
-  const [, navigate] = useLocation();
-
-  // Redirect if already logged in
-  if (user) {
-    navigate("/");
-    return null;
-  }
+  const { loginMutation, registerMutation } = useAuth();
 
   const loginForm = useForm<z.infer<typeof loginSchema>>({
     resolver: zodResolver(loginSchema),
@@ -56,7 +48,7 @@ export default function AuthPage() {
       username: "",
       password: "",
       confirmPassword: "",
-      terms: false,
+      terms: false as any, // Type assertion to fix type issue
     },
   });
 
@@ -322,13 +314,13 @@ export default function AuthPage() {
             <div className="flex items-start">
               <div className="flex-shrink-0 mt-1">
                 <svg className="h-6 w-6 text-[#FBBF24]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
               </div>
               <div className="ml-3">
-                <h3 className="text-lg font-medium">Practical Techniques</h3>
+                <h3 className="text-lg font-medium">Management Techniques</h3>
                 <p className="mt-1 text-base text-white text-opacity-80">
-                  Proven methods and strategies to help manage symptoms effectively.
+                  Proven techniques to help manage ADHD symptoms in different situations.
                 </p>
               </div>
             </div>
@@ -336,13 +328,13 @@ export default function AuthPage() {
             <div className="flex items-start">
               <div className="flex-shrink-0 mt-1">
                 <svg className="h-6 w-6 text-[#FBBF24]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
               </div>
               <div className="ml-3">
-                <h3 className="text-lg font-medium">Personalized Experience</h3>
+                <h3 className="text-lg font-medium">Regular Helpful Tips</h3>
                 <p className="mt-1 text-base text-white text-opacity-80">
-                  Save favorite techniques and customize your profile to your needs.
+                  Receive useful tips and reminders to help maintain focus and organization.
                 </p>
               </div>
             </div>
