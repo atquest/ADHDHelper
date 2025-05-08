@@ -33,14 +33,14 @@ export function setupAuth(app: Express) {
   
   const sessionSettings: session.SessionOptions = {
     secret: process.env.SESSION_SECRET || 'adhd-support-session-secret',
-    resave: false,
-    saveUninitialized: false,
+    resave: true, // Changed to true to ensure the session is saved
+    saveUninitialized: true, // Changed to true to initialize empty sessions
     store: storage.sessionStore,
     cookie: {
       maxAge: 1000 * 60 * 60 * 24 * 7, // 1 week
       httpOnly: true,
-      secure: isProduction,
-      sameSite: isProduction ? 'strict' : 'lax'
+      secure: false, // Set to false in development for testing
+      sameSite: 'lax'
     },
     name: 'adhd-support.sid'
   };
@@ -85,7 +85,15 @@ export function setupAuth(app: Express) {
   });
 
   app.post("/api/login", passport.authenticate("local"), (req, res) => {
-    res.status(200).json(req.user);
+    console.log("Login successful, user:", req.user);
+    console.log("Session after login:", req.session);
+    // Regenerate session after login
+    req.session.save((err) => {
+      if (err) {
+        console.error("Error saving session:", err);
+      }
+      res.status(200).json(req.user);
+    });
   });
 
   app.post("/api/logout", (req, res, next) => {
@@ -96,6 +104,9 @@ export function setupAuth(app: Express) {
   });
 
   app.get("/api/user", (req, res) => {
+    console.log("Session ID:", req.sessionID);
+    console.log("Authenticated:", req.isAuthenticated());
+    console.log("Session:", req.session);
     if (!req.isAuthenticated()) return res.sendStatus(401);
     res.json(req.user);
   });
