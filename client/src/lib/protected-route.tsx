@@ -1,4 +1,4 @@
-import { useAuth } from "@/hooks/use-auth";
+import { useTokenAuth } from "@/hooks/use-token-auth";
 import { Loader2 } from "lucide-react";
 import { Route, Redirect } from "wouter";
 
@@ -9,7 +9,7 @@ export function ProtectedRoute({
   path: string;
   component: () => React.JSX.Element;
 }) {
-  const { user, isLoading } = useAuth();
+  const { user, isLoading } = useTokenAuth();
 
   return (
     <Route path={path}>

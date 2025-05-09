@@ -13,6 +13,7 @@ import { ThemeProvider } from "next-themes";
 import Navbar from "./components/layout/navbar";
 import Footer from "./components/layout/footer";
 import { AuthProvider } from "./hooks/use-auth";
+import { TokenAuthProvider } from "./hooks/use-token-auth";
 
 function Router() {
   return (
@@ -30,7 +31,7 @@ function Router() {
 
 function App() {
   return (
-    <AuthProvider>
+    <TokenAuthProvider>
       <ThemeProvider attribute="class" defaultTheme="light">
         <TooltipProvider>
           <div className="min-h-screen flex flex-col">
@@ -43,7 +44,7 @@ function App() {
           </div>
         </TooltipProvider>
       </ThemeProvider>
-    </AuthProvider>
+    </TokenAuthProvider>
   );
 }
 

@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useAuth } from "@/hooks/use-auth";
+import { useTokenAuth } from "@/hooks/use-token-auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -38,7 +38,7 @@ type RegisterFormValues = z.infer<typeof registerSchema>;
 
 export default function AuthPage() {
   const [activeTab, setActiveTab] = useState<"login" | "register">("login");
-  const { user, isLoading, login, register } = useAuth();
+  const { user, isLoading, login, register } = useTokenAuth();
   const [isPendingLogin, setIsPendingLogin] = useState(false);
   const [isPendingRegister, setIsPendingRegister] = useState(false);
 

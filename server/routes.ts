@@ -1,6 +1,7 @@
 import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "http";
 import { setupAuth } from "./auth";
+import { setupTokenAuth } from "./token-auth";
 import { storage } from "./storage";
 import { db } from "./db";
 import { 
@@ -15,8 +16,9 @@ import {
 import { eq, inArray, and } from "drizzle-orm";
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // Set up authentication routes
+  // Set up authentication routes - beide methoden
   setupAuth(app);
+  setupTokenAuth(app);
 
   // Categories endpoints
   app.get("/api/categories", async (_req: Request, res: Response) => {

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useAuth } from "@/hooks/use-auth";
+import { useTokenAuth } from "@/hooks/use-token-auth";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { 
@@ -60,7 +60,7 @@ const notificationFormSchema = z.object({
 });
 
 export default function ProfilePage() {
-  const { user, logoutMutation } = useAuth();
+  const { user, logout } = useTokenAuth();
   const [editMode, setEditMode] = useState(false);
   const { toast } = useToast();
 
