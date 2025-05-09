@@ -1,4 +1,4 @@
-import type { Express, Request, Response } from "express";
+import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { setupAuth } from "./auth";
 import { setupTokenAuth } from "./token-auth";
@@ -11,14 +11,68 @@ import {
   techniquesCategories, 
   techniquesSymptoms,
   savedTechniques,
-  recentTips
+  recentTips,
+  User
 } from "@shared/schema";
 import { eq, inArray, and } from "drizzle-orm";
+
+// Helper functie om token te verifiëren
+async function verifyTokenFromHeader(req: Request): Promise<User | null> {
+  const token = req.headers.authorization?.split(' ')[1];
+  if (!token) return null;
+  
+  // In-memory token store aanroepen
+  const tokens = (global as any).tokens || {};
+  const tokenData = tokens[token];
+  
+  if (!tokenData) return null;
+  if (tokenData.expires < Date.now()) {
+    delete tokens[token];
+    return null;
+  }
+  
+  const user = await storage.getUser(tokenData.userId);
+  return user || null;
+}
+
+// Middleware voor dubbele auth ondersteuning
+function requireAuth(req: Request, res: Response, next: NextFunction) {
+  if (req.isAuthenticated()) {
+    return next(); // Session auth
+  }
+  
+  // Als session auth faalt, probeer token auth
+  verifyTokenFromHeader(req).then(user => {
+    if (user) {
+      req.user = user; // Handmatig user toevoegen
+      next();
+    } else {
+      res.status(401).json({ message: "Niet ingelogd" });
+    }
+  }).catch(err => {
+    console.error("Auth error:", err);
+    res.status(500).json({ message: "Er is een fout opgetreden bij de authenticatie" });
+  });
+}
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Set up authentication routes - beide methoden
   setupAuth(app);
   setupTokenAuth(app);
+  
+  // Maak tokens globaal beschikbaar
+  (global as any).tokens = (global as any).tokens || {};
+  
+  // Middleware om token te controleren op elke request
+  app.use(async (req: Request, _res: Response, next: NextFunction) => {
+    if (!req.isAuthenticated()) {
+      const user = await verifyTokenFromHeader(req);
+      if (user) {
+        req.user = user;
+      }
+    }
+    next();
+  });
 
   // Categories endpoints
   app.get("/api/categories", async (_req: Request, res: Response) => {
@@ -146,11 +200,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Saved techniques endpoints (requires authentication)
-  app.get("/api/saved-techniques", async (req: Request, res: Response) => {
-    if (!req.isAuthenticated()) {
-      return res.status(401).json({ error: "Authentication required" });
-    }
-    
+  app.get("/api/saved-techniques", requireAuth, async (req: Request, res: Response) => {
     try {
       const userId = req.user!.id;
       
@@ -179,11 +229,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/save-technique", async (req: Request, res: Response) => {
-    if (!req.isAuthenticated()) {
-      return res.status(401).json({ message: "You must be logged in to save techniques" });
-    }
-    
+  app.post("/api/save-technique", requireAuth, async (req: Request, res: Response) => {
     try {
       const { techniqueId } = req.body;
       if (!techniqueId) {

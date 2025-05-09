@@ -11,7 +11,9 @@ interface TokenData {
   expires: number;
 }
 
-const tokens: Record<string, TokenData> = {};
+// Maak tokens global beschikbaar
+(global as any).tokens = (global as any).tokens || {};
+const tokens: Record<string, TokenData> = (global as any).tokens;
 
 // Promisify scrypt
 const scryptAsync = promisify(scrypt);
