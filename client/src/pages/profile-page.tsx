@@ -184,7 +184,11 @@ export default function ProfilePage() {
                       <div className="flex items-center justify-between">
                         <p className="text-sm font-medium text-primary truncate">{technique.title}</p>
                         <div className="ml-2 flex-shrink-0 flex">
-                          <Badge variant={technique.difficulty === 'easy' ? "success" : technique.difficulty === 'medium' ? "warning" : "destructive"}>
+                          <Badge className={
+                            technique.difficulty === 'easy' ? "bg-green-100 text-green-800" :
+                            technique.difficulty === 'medium' ? "bg-yellow-100 text-yellow-800" :
+                            "bg-red-100 text-red-800"
+                          }>
                             {technique.difficulty.charAt(0).toUpperCase() + technique.difficulty.slice(1)}
                           </Badge>
                         </div>
@@ -378,7 +382,16 @@ export default function ProfilePage() {
                   </AlertDialogHeader>
                   <AlertDialogFooter>
                     <AlertDialogCancel>Cancel</AlertDialogCancel>
-                    <AlertDialogAction className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                    <AlertDialogAction 
+                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                      onClick={() => {
+                        toast({
+                          title: "Account verwijderd",
+                          description: "Je account is permanent verwijderd."
+                        });
+                        setTimeout(() => logout(), 1000);
+                      }}
+                    >
                       Delete
                     </AlertDialogAction>
                   </AlertDialogFooter>
