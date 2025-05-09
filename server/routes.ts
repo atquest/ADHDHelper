@@ -1,7 +1,7 @@
 import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { setupAuth } from "./auth";
-import { setupTokenAuth } from "./token-auth";
+import { setupTokenAuth, verifyToken } from "./token-auth";
 import { storage } from "./storage";
 import { db } from "./db";
 import { 
@@ -21,18 +21,8 @@ async function verifyTokenFromHeader(req: Request): Promise<User | null> {
   const token = req.headers.authorization?.split(' ')[1];
   if (!token) return null;
   
-  // In-memory token store aanroepen
-  const tokens = (global as any).tokens || {};
-  const tokenData = tokens[token];
-  
-  if (!tokenData) return null;
-  if (tokenData.expires < Date.now()) {
-    delete tokens[token];
-    return null;
-  }
-  
-  const user = await storage.getUser(tokenData.userId);
-  return user || null;
+  // Gebruik de geëxporteerde verifyToken functie uit token-auth.ts
+  return await verifyToken(token);
 }
 
 // Middleware voor dubbele auth ondersteuning
@@ -276,11 +266,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/remove-technique", async (req: Request, res: Response) => {
-    if (!req.isAuthenticated()) {
-      return res.status(401).json({ message: "You must be logged in to remove techniques" });
-    }
-    
+  app.delete("/api/remove-technique", requireAuth, async (req: Request, res: Response) => {
     try {
       const { techniqueId } = req.body;
       if (!techniqueId) {

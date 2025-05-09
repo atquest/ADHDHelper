@@ -11,9 +11,26 @@ interface TokenData {
   expires: number;
 }
 
-// Maak tokens global beschikbaar
+// Maak tokens en verificatie functie global beschikbaar
 (global as any).tokens = (global as any).tokens || {};
 const tokens: Record<string, TokenData> = (global as any).tokens;
+
+// Zet de verifyToken functie globaal, zodat andere modules (zoals auth.ts) er ook bij kunnen
+(global as any).verifyTokenFn = async (token: string): Promise<SelectUser | null> => {
+  const tokenData = tokens[token];
+  
+  if (!tokenData) {
+    return null;
+  }
+  
+  if (tokenData.expires < Date.now()) {
+    delete tokens[token]; // Verwijder verlopen tokens
+    return null;
+  }
+  
+  const user = await storage.getUser(tokenData.userId);
+  return user || null;
+};
 
 // Promisify scrypt
 const scryptAsync = promisify(scrypt);
@@ -49,7 +66,7 @@ function createToken(userId: number, expiresIn: number = 7 * 24 * 60 * 60 * 1000
 }
 
 // Helper functie om een token te valideren
-async function verifyToken(token: string): Promise<SelectUser | null> {
+export async function verifyToken(token: string): Promise<SelectUser | null> {
   const tokenData = tokens[token];
   
   if (!tokenData) {

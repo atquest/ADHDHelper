@@ -164,21 +164,45 @@ export function setupAuth(app: Express) {
     });
   });
 
-  app.get("/api/user", (req: Request, res: Response) => {
+  app.get("/api/user", async (req: Request, res: Response) => {
     console.log("GET /api/user - Session ID:", req.sessionID);
     console.log("GET /api/user - isAuthenticated:", req.isAuthenticated());
     console.log("GET /api/user - Session:", req.session);
     console.log("GET /api/user - User:", req.user);
     
-    if (!req.isAuthenticated()) {
-      console.log("GET /api/user - Gebruiker niet ingelogd");
-      return res.status(401).json({ message: "Niet ingelogd" });
+    // Eerst controleren op session auth
+    if (req.isAuthenticated() && req.user) {
+      console.log("GET /api/user - Gebruiker ingelogd via session");
+      const { password, ...userWithoutPassword } = req.user as SelectUser;
+      console.log("GET /api/user - Succesvol, stuur gebruiker terug:", userWithoutPassword);
+      return res.status(200).json(userWithoutPassword);
     }
     
-    // Retourneer de gebruiker zonder wachtwoord
-    const { password, ...userWithoutPassword } = req.user as SelectUser;
-    console.log("GET /api/user - Succesvol, stuur gebruiker terug:", userWithoutPassword);
-    res.status(200).json(userWithoutPassword);
+    // Als session auth faalt, probeer token auth
+    const token = req.headers.authorization?.split(' ')[1];
+    console.log("GET /api/user - Token in headers:", token ? "ja" : "nee");
+    
+    if (token) {
+      try {
+        // Importeer verifyToken als het nodig is
+        const verifyToken = (global as any).verifyTokenFn;
+        if (typeof verifyToken === 'function') {
+          const user = await verifyToken(token);
+          if (user) {
+            console.log("GET /api/user - Gebruiker ingelogd via token");
+            const { password, ...userWithoutPassword } = user;
+            return res.status(200).json(userWithoutPassword);
+          }
+        } else {
+          console.log("GET /api/user - verifyTokenFn niet beschikbaar als globale functie");
+        }
+      } catch (error) {
+        console.error("Token verificatie error:", error);
+      }
+    }
+    
+    console.log("GET /api/user - Gebruiker niet ingelogd");
+    return res.status(401).json({ message: "Niet ingelogd" });
   });
 
   // Helper route voor debug doeleinden
