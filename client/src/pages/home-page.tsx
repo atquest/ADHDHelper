@@ -1,4 +1,4 @@
-import { useAuth } from "@/hooks/use-auth";
+import { useTokenAuth } from "@/hooks/use-token-auth";
 import CategoryCard from "@/components/dashboard/category-card";
 import RecentTipCard from "@/components/dashboard/recent-tip-card";
 import { useQuery } from "@tanstack/react-query";
@@ -24,7 +24,7 @@ const categoryIcons: Record<string, any> = {
 };
 
 export default function HomePage() {
-  const { user } = useAuth();
+  const { user } = useTokenAuth();
 
   // Fetch categories
   const { 
